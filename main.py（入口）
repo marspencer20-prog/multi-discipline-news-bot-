@@ -1,0 +1,60 @@
+import os
+import sys
+import yaml
+import argparse
+from pathlib import Path
+
+# 导入配置和抓取模块
+from config.disciplines import resolve_discipline
+from searcher.fetch import collect_all
+from notifier import send
+
+CONFIG_DIR = Path("config")
+PROFILES_DIR = CONFIG_DIR / "profiles"
+SOURCES_FILE = CONFIG_DIR / "sources.yaml"
+
+def load_yaml(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", default=os.getenv("BOT_PROFILE", "land_economy"), help="专业profile名")
+    parser.add_argument("--dry", action="store_true", help="只打印不推送")
+    args = parser.parse_args()
+
+    # 1. 加载专业profile
+    profile_path = PROFILES_DIR / f"{args.profile}.yaml"
+    if not profile_path.exists():
+        print(f"[ERROR] Profile not found: {profile_path}")
+        sys.exit(1)
+    profile = load_yaml(profile_path)
+
+    # 2. 解析专业词典，生成关键词
+    discipline_name = profile.get("discipline", args.profile)
+    resolved_name, discipline_cfg = resolve_discipline(discipline_name)
+    profile["_resolved_auto_kws"] = discipline_cfg.get("auto_keywords", [])
+    profile["queries"] = {
+        "guardian": discipline_cfg.get("auto_keywords", []),
+        "crossref": {"query": discipline_cfg.get("crossref_query", "")}
+    }
+
+    # 3. 加载信息源
+    sources = load_yaml(SOURCES_FILE).get("sources", [])
+
+    # 4. 抓取
+    items = collect_all(sources, profile)
+    print(f"[Bot] 共抓到 {len(items)} 条")
+
+    if args.dry:
+        for it in items:
+            print(f"  [{it['type']}] {it['title'][:80]}\n     {it['url']}")
+    else:
+        webhook = os.environ.get("DINGTALK_WEBHOOK", "")
+        if not webhook.startswith("https://oapi.dingtalk.com"):
+            print("❌ 环境变量 DINGTALK_WEBHOOK 未设置！")
+            sys.exit(1)
+        send(items, webhook, profile.get("profile_id", args.profile), profile)
+
+if __name__ == "__main__":
+    main()
