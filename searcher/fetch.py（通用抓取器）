@@ -1,0 +1,121 @@
+import os
+import time
+import hashlib
+import feedparser
+import requests
+from datetime import datetime, timezone
+
+SESSION = requests.Session()
+SESSION.headers["User-Agent"] = "scholar-bot/1.0 (+https://github.com/your-repo; mailto=your_email@example.com)"
+
+def _dedup_key(item):
+    uid = item.get("url") or item.get("doi") or item.get("title", "")
+    return hashlib.sha1(uid.encode()).hexdigest()[:16]
+
+def fetch_rss(source, profile, limit=20):
+    url = source["url"]
+    feed = feedparser.parse(url)
+    items = []
+    for e in (feed.entries or []):
+        title = (e.get("title") or "").strip()
+        summary = (e.get("summary") or e.get("description") or "").strip()
+        link = (e.get("link") or "").strip()
+        if not link:
+            continue
+        # 白名单过滤（如果启用）
+        if profile.get("whitelist_domains") and source.get("whitelist_only"):
+            if not any(domain in link for domain in profile["whitelist_domains"]):
+                continue
+        items.append({
+            "id": f"rss-{_dedup_key({'url': link})}",
+            "type": source.get("type", "news"),
+            "title": title,
+            "summary": summary[:300],
+            "url": link,
+            "pub_date": "",
+            "source_label": source["id"],
+        })
+    return items[:limit]
+
+def fetch_guardian(profile):
+    api_key = os.environ.get("GUARDIAN_API_KEY", "")
+    if not api_key:
+        return []
+    queries = profile.get("queries", {}).get("guardian", [])
+    if not queries:
+        return []
+    items = []
+    for q in queries:
+        params = {
+            "api-key": api_key,
+            "q": q,
+            "page-size": 20,
+            "order-by": "newest",
+            "show-fields": "headline,trailText,webUrl",
+        }
+        try:
+            r = SESSION.get("https://content.guardianapis.com/search", params=params, timeout=18)
+            r.raise_for_status()
+            for it in r.json().get("response", {}).get("results", []):
+                f = it.get("fields", {})
+                items.append({
+                    "id": f"gu-{it.get('id', '').replace('/', '_')}",
+                    "type": "news",
+                    "title": f.get("headline") or it.get("webTitle", ""),
+                    "summary": (f.get("trailText") or "")[:200],
+                    "url": it.get("webUrl", ""),
+                    "pub_date": (it.get("webPublicationDate") or "")[:10],
+                    "source_label": "The Guardian",
+                })
+            time.sleep(0.3)
+        except Exception as e:
+            print(f"[warn] Guardian fetch error: {e}")
+    return items
+
+def fetch_crossref(source, profile, rows=20):
+    mail = source.get("mailto", "")
+    q = profile.get("queries", {}).get("crossref", {}).get("query", "")
+    filter_issn = profile.get("queries", {}).get("crossref", {}).get("filter_issn", [])
+    params = {
+        "query": q,
+        "rows": rows,
+        "sort": "published-newest",
+        "mailto": mail,
+    }
+    if filter_issn:
+        params["filter"] = ",".join(f"issn:{i}" for i in filter_issn)
+    try:
+        r = SESSION.get("https://api.crossref.org/works", params=params, timeout=20)
+        r.raise_for_status()
+        items = []
+        for it in r.json().get("message", {}).get("items", []):
+            doi = it.get("DOI", "")
+            url = f"https://doi.org/{doi}" if doi else ""
+            title = " ".join(it.get("title", [])) if isinstance(it.get("title"), list) else it.get("title", "")
+            items.append({
+                "id": f"cr-{doi or title}",
+                "type": "paper",
+                "title": title,
+                "summary": (it.get("container-title") or [""])[0],
+                "url": url,
+                "doi": doi,
+                "pub_date": (it.get("published-print") or it.get("published-online") or "")[:10],
+                "source_label": "Crossref",
+            })
+        return items
+    except Exception as e:
+        print(f"[warn] Crossref fetch error: {e}")
+        return []
+
+def collect_all(sources, profile):
+    items = []
+    for s in sources:
+        if not s.get("enabled"):
+            continue
+        if s.get("method") == "rss":
+            items.extend(fetch_rss(s, profile, limit=20))
+        elif s.get("method") == "crossref":
+            items.extend(fetch_crossref(s, profile, rows=20))
+    # Guardian 单独处理
+    items.extend(fetch_guardian(profile))
+    return items
