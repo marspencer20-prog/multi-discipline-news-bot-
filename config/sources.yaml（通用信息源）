@@ -1,0 +1,21 @@
+sources:
+  - id: bbc_uk_news
+    type: news
+    method: rss
+    url: "http://feeds.bbci.co.uk/news/uk/rss.xml"
+    enabled: true
+    tags: [general_news]
+    whitelist_only: false
+
+  - id: the_guardian_search
+    type: news
+    method: guardian_search
+    enabled: true
+    tags: [general_news]
+
+  - id: crossref_search
+    type: paper
+    method: crossref
+    enabled: true
+    tags: [paper]
+    mailto: "your_email@example.com"  # 替换为你的邮箱
