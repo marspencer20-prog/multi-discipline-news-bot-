@@ -1,0 +1,9 @@
+profile_id: land_economy
+discipline: land economy   # 自动匹配词典生成关键词
+
+# 留空：不指定方向 = 抓全领域
+direction_keywords: []
+# 示例：以后想锁方向，取消注释
+# direction_keywords:
+#   - "affordable housing"
+#   - "social housing"
