@@ -1,0 +1,24 @@
+import re
+
+def match_score(text, keywords):
+    tl = text.lower()
+    return sum(1 for kw in keywords if kw.lower() in tl)
+
+def has_direction_hit(item, direction_keywords):
+    if not direction_keywords:
+        return False
+    hay = f"{item.get('title', '')} {item.get('summary', '')}"
+    return any(kw.lower() in hay.lower() for kw in direction_keywords)
+
+def classify_items(articles, profile_dict):
+    """返回 (普通文章列表, 方向专属文章列表)"""
+    auto_kws = profile_dict.get("_resolved_auto_kws", [])
+    dir_kws = profile_dict.get("direction_keywords", [])
+    normal = []
+    star = []
+    for a in articles:
+        if has_direction_hit(a, dir_kws):
+            star.append(a)
+        elif match_score(f"{a['title']} {a['summary']}", auto_kws):
+            normal.append(a)
+    return normal, star
