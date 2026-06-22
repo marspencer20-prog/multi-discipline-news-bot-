@@ -1,0 +1,46 @@
+import json
+import requests
+from datetime import datetime
+
+def build_text(normal_items, star_items, title_bar):
+    lines = [title_bar, "—" * 30]
+
+    if star_items:
+        lines.append("\n🎯 🎯 🎯  你关注的方向有新动态  🎯 🎯 🎯")
+        for i, a in enumerate(star_items, 1):
+            lines += _block(i, a, tag="⭐ 方向匹配")
+
+    if normal_items:
+        lines.append("\n📰 其他相关专业资讯")
+        for i, a in enumerate(normal_items, 1):
+            lines += _block(i, a, tag=None)
+    else:
+        if not star_items:
+            lines.append("\n（今日无匹配）")
+
+    return "\n".join(lines)
+
+def _block(idx, a, tag):
+    b = []
+    prefix = f"{idx}" + (f" [{tag}]" if tag else "")
+    b.append(f"\n{prefix}. 【{a['source_label']}】{a['title']}")
+    if a.get("pub_date"):
+        b.append(f"   📅 {a['pub_date']}")
+    if a.get("summary"):
+        s = a["summary"].strip().replace("\n", " ")[:180]
+        b.append(f"   👁 {s}…")
+    b.append(f"   🔗 {a['url']}")
+    return b
+
+def send(articles, webhook_url, profile_name, profile_dict):
+    today = datetime.now().strftime("%Y-%m-%d")
+    title = f"📰 {profile_name} 每日简报  {today}"
+
+    from searcher.classify import classify_items
+    normal, star = classify_items(articles, profile_dict)
+
+    text = build_text(normal, star, title)
+    payload = {"msgtype": "text", "text": {"content": text}}
+
+    r = requests.post(webhook_url, headers={"Content-Type": "application/json"}, data=json.dumps(payload), timeout=10)
+    print(r.json())
