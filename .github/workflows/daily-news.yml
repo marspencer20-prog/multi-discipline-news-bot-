@@ -1,0 +1,33 @@
+name: Multi-Professional News Bot
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "专业名（如 land_economy / anthropology）"
+        required: false
+        default: "land_economy"
+
+jobs:
+  push-news:
+    runs-on: ubuntu-latest
+    env:
+      BOT_PROFILE: ${{ github.event.inputs.profile || 'land_economy' }}
+      DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+      GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python main.py
+      - name: Commit seen_ids.txt
+        run: |
+          git config user.name "news-bot[bot]"
+          git config user.email "bot@multi-discipline-news-bot.local"
+          git add seen_ids.txt
+          git diff --cached --quiet || git commit -m "chore: update seen_ids [skip ci]"
+          git pull --rebase origin main || echo "no remote changes"
+          git push
