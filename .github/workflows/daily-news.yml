@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BOT_PROFILE: ${{ github.event.inputs.profile || 'land_economy' }}
-      # ✅ 注入所有机器人的Webhook
       DINGTALK_WEBHOOK_LAND_ECONOMY: ${{ secrets.DINGTALK_WEBHOOK_LAND_ECONOMY }}
       DINGTALK_WEBHOOK_ANTHROPOLOGY: ${{ secrets.DINGTALK_WEBHOOK_ANTHROPOLOGY }}
       DINGTALK_WEBHOOK_ECONOMICS: ${{ secrets.DINGTALK_WEBHOOK_ECONOMICS }}
       GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # ✅ 提前切换到 Node 24
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
