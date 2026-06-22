@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - run: pip install -r requirements.txt
-      - - run: cd multi-discipline-news-bot && python main.py
+      - run: cd multi-discipline-news-bot && python main.py
       - name: Commit seen_ids.txt
         run: |
           git config user.name "news-bot[bot]"
