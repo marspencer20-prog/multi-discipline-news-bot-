@@ -14,13 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BOT_PROFILE: ${{ github.event.inputs.profile || 'land_economy' }}
-      DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+      # ✅ 注入所有机器人的Webhook
+      DINGTALK_WEBHOOK_LAND_ECONOMY: ${{ secrets.DINGTALK_WEBHOOK_LAND_ECONOMY }}
+      DINGTALK_WEBHOOK_ANTHROPOLOGY: ${{ secrets.DINGTALK_WEBHOOK_ANTHROPOLOGY }}
+      DINGTALK_WEBHOOK_ECONOMICS: ${{ secrets.DINGTALK_WEBHOOK_ECONOMICS }}
       GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        with: { python-version: "3.11" }
       - run: pip install -r requirements.txt
       - run: python main.py
       - name: Commit seen_ids.txt
